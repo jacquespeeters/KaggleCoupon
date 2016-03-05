@@ -1,6 +1,7 @@
 # Jacques Peeters
 # Projet de fin d'études - Polytech Lille
 # kaggle.com/c/coupon-purchase-prediction/
+# github.com/l4mun/KaggleCoupon
 
 library(dplyr)
 library(Matrix)
@@ -11,7 +12,6 @@ setwd("C:/Users/Jacques/Documents/PFE/jacques")
 
 # Lecture des jeux de données avec le package data.table pour gagner du temps
 #####
-# couponarea = fread("data/couponarea.csv")
 couponlist= fread("data/couponlist.csv")
 userlist= fread("data/userlist.csv") #un warning, non gênant
 userlist$user_id = as.integer(userlist$user_id)
@@ -19,58 +19,51 @@ weblog= fread("data/weblog.csv")
 weblog$user_id = as.integer(weblog$user_id)
 weblog$coupon_id = as.integer(weblog$coupon_id)
 
-
 ########################
-# Stats descriptives
+# quelques Stats descriptives
 ########################
 # nrow(filter(userlist, gender==0)) / nrow(userlist)
 
-couponlist$coupon_id = as.numeric(couponlist$coupon_id )
-
-weblog %>% filter(coupon_id %in% unique(couponlist$coupon_id)) -> weblogF
-
-weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(price_rate) %>% summarise( nb = n())  -> info
-couponlist %>% group_by( price_rate) %>% summarise( div = n()) -> info1
-info2 = left_join(info1, info)
-plot(info2$price_rate, info2$nb / info2$div )
-
-weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(discount_price) %>% summarise( nb = n())  -> info
-couponlist %>% group_by( discount_price) %>% summarise( div = n()) -> info1
-info2 = left_join(info1, info)
-plot(info2$discount_price, info2$nb / info2$div )
-
-weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(disp_period) %>% summarise( nb = n())  -> info
-couponlist %>% group_by( disp_period) %>% summarise( div = n()) -> info1
-info2 = left_join(info1, info)
-plot(info2$disp_period, info2$nb / (info2$div+500 ))
-
-weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(valid_period) %>% summarise( nb = n())  -> info
-couponlist %>% group_by( valid_period) %>% summarise( div = n()) -> info1
-info2 = left_join(info1, info)
-plot(info2$valid_period, info2$nb / (info2$div ))
-
-
-# plot(lowess(info$discount_price, info$nb, f=10, iter=10), type="l")
-# plot(info$price_rate, info$nb)
-# plot(lowess(info$price_rate, info$nb))
+# couponlist$coupon_id = as.numeric(couponlist$coupon_id )
 # 
-# hist(as.numeric(userlist$age))
+# weblog %>% filter(coupon_id %in% unique(couponlist$coupon_id)) -> weblogF
+# 
+# weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(price_rate) %>% summarise( nb = n())  -> info
+# couponlist %>% group_by( price_rate) %>% summarise( div = n()) -> info1
+# info2 = left_join(info1, info)
+# plot(info2$price_rate, info2$nb / info2$div )
+# 
+# weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(discount_price) %>% summarise( nb = n())  -> info
+# couponlist %>% group_by( discount_price) %>% summarise( div = n()) -> info1
+# info2 = left_join(info1, info)
+# plot(info2$discount_price, info2$nb / info2$div )
+# 
+# weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(disp_period) %>% summarise( nb = n())  -> info
+# couponlist %>% group_by( disp_period) %>% summarise( div = n()) -> info1
+# info2 = left_join(info1, info)
+# plot(info2$disp_period, info2$nb / (info2$div+500 ))
+# 
+# weblogF %>% filter(purchase_flag ==1) %>% left_join(couponlist) %>% group_by(valid_period) %>% summarise( nb = n())  -> info
+# couponlist %>% group_by( valid_period) %>% summarise( div = n()) -> info1
+# info2 = left_join(info1, info)
+# plot(info2$valid_period, info2$nb / (info2$div ))
+
 
 ########################
 # Feature engineering
 ########################
-# Pour cela il faut créer des variables clés depuis couponlist
+# copie pour éviter d'écraser des informations
 feature=couponlist
 
 # Dates
 # Je ne tiens pas compte des dates (même si on pourrait tester que plus l'achat est ancien, moins il a d'importance)
-# Seul les durée sont iportantes
-feature %>% select (-c(disp_from, disp_end,valid_from,valid_end)) ->feature
+# Seul les durée sont importantes
+feature %>% select (-c(disp_from, disp_end,valid_from,valid_end)) -> feature
 
 # capsulte_text et genre_name
 # capsule_text inclu dans genre_name
 # unique(feature$capsule_text)
-unique(couponlist$genre_name)
+# unique(couponlist$genre_name)
 # Les variables sont très corrélées, je décide de ne garder que genre_name
 feature %>% select(-capsule_text) -> feature
 
@@ -93,12 +86,10 @@ feature %>% select(-c(shop_pref_name)) -> feature
 # Je raccourcis le nom des variables
 setnames(feature, "shop_large_area_name", "large_area_name")
 setnames(feature, "shop_small_area_name", "small_area_name")
-# setnames(feature, "shop_pref_name", "pref_name")
 
 # Je passe les variables large_area_name et small_area_name en dummies (1/0)
 feature = dummy.data.frame(feature, names = "large_area_name", sep=":")
 feature = dummy.data.frame(feature, names = "small_area_name", sep=":")
-# feature = dummy.data.frame(feature, names = "pref_name", sep=":")
 
 # Prix
 feature$discount_price = 1/(log10(feature$discount_price+1)+1)
@@ -114,15 +105,16 @@ feature$valid_period = feature$valid_period / max(feature$valid_period)
 ######################## 
 
 # Les fonctions
-# Création de la matrice sparse en fonction des notes des users 
+# Création de la matrice sparse en fonction des notes des utilisateurs 
 fURM = function(URM){
   sURM = sparseMatrix(URM$user_id, URM$coupon_id, x = URM$rating)
-  col = unique(weblogF$coupon_id) #On garde que les colonnes intéressantes
-  col=sort(col) #Il faut ordonner les colonnes à suppr
-  sURM=sURM[,col] # sinon la cmd suivante ne marche...
+  col = unique(weblogF$coupon_id) #On ne garde que les colonnes intéressantes
+  col=sort(col) #Il faut ordonner les colonnes à conserver
+  sURM=sURM[,col] # sinon la commande suivante marche mal, je l'ai appris douloureusement
   return(sURM)
 }
 
+# Permet la création de la matrice diagonale W à partir d'un vecteur weight.
 get.W = function(weight){
   W=c(
     rep(weight[1], length(unique(couponlist$genre_name))), #Il faut répliquer weight[1] autant de fois qu'il de variables dummies pour genre_name
@@ -137,12 +129,11 @@ get.W = function(weight){
   return (W)
 }
 
-# Prédiction des notes pour les couponTest pour l'ensemble des users
+# Prédiction des notes pour les couponTest pour chaque groupe d'utilisateurs
 prediction = function(sURM, couponTest, couponTrain, W, subUsers, coupon_id_hash, user_id_hash){
   div = rowSums(sURM)
   div[which(div ==0)]=1 #Simplement pour éviter les divisions par 0
   userPref = (sURM %*% as.matrix(couponTrain[,-length(couponTrain)])) / div
-  # Faut-il diviser par le nombre d'achat pour garder l'équilibre lors des weight? Il faut car je mets les var suivantes à 1, sinon désiquilibre!
   # Mettre price_rate, catalog_price, discount_price, disp_period, valid_period à 1
   # En effet, les utilisateurs cherchent toujours des prix bas et des période d'achat et d'utilisation grande. Indépendant de leurs achats précédents.
   userPref[,c(14,15,16,17,18)] = 1
@@ -153,7 +144,7 @@ prediction = function(sURM, couponTest, couponTrain, W, subUsers, coupon_id_hash
     score[subUsers[[i]],] = as.matrix(userPref[subUsers[[i]],] %*% diag(W[[i]]) %*% t(as.matrix(couponTest[,-length(couponTrain)])))
   }
   
-  # coupon_id_hash$coupon_id = as.character(coupon_id_hash$coupon_id) #pour permettre la jointure
+  coupon_id_hash$coupon_id = as.character(coupon_id_hash$coupon_id) #pour permettre la jointure
   left_join(couponTest, coupon_id_hash) %>% select(coupon_id, coupon_hash) -> name #Les coupon_id_hash ordonnés selon couponTest
   submission = matrix(data = NA, nrow = nrow(score), ncol=2) 
   submission = as.data.frame(submission) #Le data.frame qui va accueillir les prédictions 
@@ -173,8 +164,6 @@ prediction = function(sURM, couponTest, couponTrain, W, subUsers, coupon_id_hash
 
 # Filtrer les coupons qui ne sont pas dans couponlist => aucunes infos sur eux, impossibilité de calculer des similarités
 weblog %>% filter(coupon_id %in% unique(couponlist$coupon_id)) -> weblogF
-
-# table(weblogF$user_id)
 
 # Créer rating(user_id, coupon_id) en fct de purchase, nombre de visite, ...
 weblogF %>% 
@@ -201,17 +190,7 @@ feature %>% filter(coupon_id %in% couponTrain) %>% select(-c(dataset)) -> coupon
 couponTrain$coupon_id = as.integer(couponTrain$coupon_id)
 couponTrain = arrange(couponTrain,coupon_id)
 
-# On paramètre la matrice de poids
-# weight = c(10,  #genre_name   
-#            0.00,   #price_rate
-#            0.05,   #catalog_price
-#            6.5,  #discount_price
-#            6.5,   #disp_period
-#            0, #valid_period
-#            0,   #usable_date_DAY
-#            1.5,   # large_area_name
-#            26)  # small_area_name
-
+# On paramètre les matrices de poids
 weightFemale = c(10,  #genre_name   
            0.1,   #price_rate
            0.05,   #catalog_price
@@ -248,27 +227,22 @@ rm(nameFile)
 
 
 
-
-
-
-
-
-
-
-
 # Partie locale
 ##################################################
 
 # Filtrer les coupons qui ne sont pas dans couponlist => aucunes infos sur eux, impossibilité de calculer des similarités...
 weblog %>% filter(coupon_id %in% unique(couponlist$coupon_id)) -> weblogF
 
+# Placer les 7 derniers jours dans weblogTest et le reste dans weblogTrain
 limite=sort(unique(weblogF$activity_date), decreasing = T)[7]
 weblogTest= filter(weblogF, activity_date >=limite)
 weblogTrain = filter(weblogF, activity_date <limite)
 rm(limite)
 
+# Supprimmer de weblogTest les coupon qui sont dans weblogTrain
 weblogTest <- weblogTest %>% filter(!coupon_id %in% unique(weblogTrain$coupon_id))
 
+# Identifier les achats (utilisateur, coupon) et les placer dans actual
 weblogTest %>% 
   group_by(user_id, coupon_id) %>%
   summarise(rating = (ifelse(sum(purchase_flag)>0, 1, 0))) %>%
@@ -276,6 +250,7 @@ weblogTest %>%
   group_by(user_id) %>% 
   summarize(purchased = list(coupon_id))-> actual
 
+# Compter le nombre d'achats par coupon et un peu d'analyse
 weblogTest %>% 
   group_by(user_id, coupon_id) %>%
   summarise(rating = (ifelse(sum(purchase_flag)>0, 1, 0))) %>%
@@ -285,11 +260,10 @@ weblogTest %>%
 nbAchat = arrange(nbAchat, desc(nb))
 nbAchat
 nbAchat$coupon_id[1]
-plot(nbAchat$nb)
+plot(nbAchat$nb/sum(nbAchat$nb), xlab="Coupons ordonnés", ylab="Nombre d'achats", main="Poids des coupons pour le nombre d'achat total de coupons")
 
-sum(nbAchat$nb[1:100]) / sum(nbAchat$nb)
-sum(nbAchat$nb[-(1:50)])
-tail(nbAchat)
+sum(nbAchat$nb[1:4]) / sum(nbAchat$nb)
+sum(nbAchat$nb) - sum(nbAchat$nb[1:4])
 
 actualp=matrix(data = NA, nrow=nrow(userlist), ncol=1)
 actualp = as.data.frame(actualp)
@@ -310,6 +284,7 @@ couponTrain = arrange(couponTrain, coupon_id)
 
 # Mes fonctions
 ###############
+# Fonction proposée par Kaggle pour calculer l'Average Precision
 apk <- function(k, actual, predicted){
   score <- 0.0
   cnt <- 0.0
@@ -325,6 +300,7 @@ apk <- function(k, actual, predicted){
   score
 }
 
+# Fonction proposée par Kaggle pour calculer le Mean Average Precision
 mapk <- function (k, actual, predicted){
   if( length(actual)==0 || length(predicted)==0 ) 
   {
@@ -340,17 +316,19 @@ mapk <- function (k, actual, predicted){
   score
 }
 
+# Fonction pour la  matrice sparse locale
 fURM = function(visit){
   weblogTrain %>% 
     group_by(user_id, coupon_id) %>%
     summarise(rating = (ifelse(sum(purchase_flag)>0, 1, 0) + n()*visit)) -> URM
-  sURM = sparseMatrix(URM$user_id, URM$coupon_id, x = URM$rating)#, dims=c(15374,37142), dimnames=list(1:15374,1:37142))
+  sURM = sparseMatrix(URM$user_id, URM$coupon_id, x = URM$rating)
   col = unique(weblogTrain$coupon_id) #On garde que les colonnes intéressantes
-  col=sort(col) #Mais lol, il fallait ordonner les col sinon ca ne marche pas, i'm mad! 
+  col=sort(col) 
   sURM=sURM[,col]
   return(sURM)
 }
 
+# Permet de réaliser les prédictions en local puis calculer la performance MAP@10
 predictionLocal = function(W, users){
   score = as.matrix(userPref %*% diag(W) %*% t(as.matrix(couponTest[-length(couponTrain)])))
   name = couponTest$coupon_id
@@ -375,11 +353,12 @@ div[which(div ==0)]=1
 userPref = (sURM %*% as.matrix(couponTrain[-length(couponTrain)])) / div
 
 userlist = arrange(userlist, user_id)
+users = userlist$user_id
 users <- filter(userlist, gender == 1)$user_id
 
 res=c()
 # iter = (-10:10)/10+autour
-iter = (0:50) / 1
+iter = (1:50)
 for (i in iter){
   weight = c(10,  #genre_name   
              0,   #price_rate
